@@ -4,12 +4,21 @@
 // depending on a link back to wherever it was originally hosted.
 //
 // pptxgenjs has no support for this, so the .pptx it writes (itself a zip)
-// is patched directly with JSZip afterwards. A native OOXML file
-// (.docx/.xlsx/.pptx and their macro-enabled variants) is already a zip
-// package in its own right, so it can be embedded as-is via the "package"
-// relationship type — no legacy OLE1/compound-file wrapping needed. Anything
-// outside that family isn't embedded; the caller falls back to a plain
-// label instead.
+// is patched directly with JSZip afterwards. A native OOXML file is already
+// a zip package in its own right, so it can be embedded as-is via the
+// "package" relationship type — no legacy OLE1/compound-file wrapping
+// needed.
+//
+// Only docx/xlsx (and their macro-enabled variants) are listed here. A pptx
+// embeds just as validly by the same mechanism and PowerPoint's UI accepts
+// it (selection, context menu, "Open" submenu all work), but double-clicking
+// to activate it does nothing on Mac PowerPoint — confirmed both for a
+// generated embed and for an already-existing, unrelated genuine .pptx
+// attachment, so this isn't specific to how the file was produced. Rather
+// than ship an embed that looks right but silently doesn't open, pptx/pptm
+// (and anything else outside this list, including PDFs, which were never
+// embeddable at all) are bundled alongside the forged presentation instead
+// — see bundleResources.ts — and the caller falls back to a plain label.
 
 import JSZip from "jszip";
 
@@ -42,22 +51,13 @@ const EMBEDDABLE_KINDS: Record<string, EmbeddableKind> = {
     contentType: "application/vnd.ms-excel.sheet.macroEnabled.12",
     progId: "Excel.Sheet.12",
   },
-  pptx: {
-    extension: "pptx",
-    contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    progId: "PowerPoint.Show.12",
-  },
-  pptm: {
-    extension: "pptm",
-    contentType: "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
-    progId: "PowerPoint.Show.12",
-  },
 };
 
-/** True for a file type that's itself an OOXML zip package, so it can be
- * embedded directly without any legacy binary conversion. Anything else
- * (pdf, images-as-resources, plain docs, …) is out of scope for embedding —
- * the resource card falls back to a plain label for those. */
+/** True for a file type known to actually open on double-click once
+ * embedded (see the module comment for why pptx isn't here despite being
+ * structurally embeddable the same way). Anything else (pdf, pptx/pptm,
+ * images-as-resources, plain docs, …) is out of scope for embedding — the
+ * resource card bundles those alongside the presentation instead. */
 export function resolveEmbeddableKind(filename: string): EmbeddableKind | null {
   const dot = filename.lastIndexOf(".");
   if (dot === -1) return null;

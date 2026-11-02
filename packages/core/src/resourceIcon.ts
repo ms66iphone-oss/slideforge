@@ -1,9 +1,10 @@
-// A small, generic document glyph used as the visible picture for an
-// embedded resource — this is what PowerPoint's slide surface shows in place
-// of the actual file (which only opens when a teacher double-clicks it
-// during presenting/editing). Baked in as a static asset rather than drawn
-// with Canvas at runtime, since jsdom (the test environment) has no 2D
-// canvas context and this repo stays dependency-free otherwise.
+// A small, generic document glyph used as the visible picture for a resource
+// card — either an embedded resource (double-click to open in place) or a
+// resource bundled alongside the presentation (see bundleResources.ts); the
+// caption text next to it is what tells the two apart. Baked in as a static
+// asset rather than drawn with Canvas at runtime, since jsdom (the test
+// environment) has no 2D canvas context and this repo stays
+// dependency-free otherwise.
 
 export const RESOURCE_ICON_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAPAAAAEsCAYAAAD93j5yAAADwklEQVR42u3dMVLCQBiG4cThFqSzIzchnVex8Qg2XsUObgKdXTgHXsAZGCVOvn+fp3Yyw2ZfdwPKdh0AAAAAAAAAAAAAAAAAALBW/V8vsN3tr4aRJV3Ox94o/OzJELB2FgkBI2IBg4gFDCIWMCJmsXeh59PB6PJrwzjd/BnvTluBWal7FgArsYARsYDhv3y+fYlYwIhYwCBiAYOIBYyIG4xYwIhYwCBiAYOIBYyIW4lYwIhYwCBiAYOIBQytRCxgRCxgELGAQcQChlYiFjAiDo5YwIg4OGIBI+LgiAWMiIMjFjAiDo5YwBAcsYAhOGIBQ3DEAobgiAUMwRELGIIjFjAERyxgCI5YwBAcsYAhOGIBQ3DEAobgiAUMwRELGIIjFjAERyxgCI5YwBAcsYAhOGIBQ3DEAobgiAUMwRELGIIj3hhmkry8P8e/hu1uf72cj70VGIIjFjA0HrGAIThiz8Cs2nw6xL+GYZwWu7YVGIJ/CQkYgiMWMAQTMAgYEDAgYBAwIGBAwICAQcCAgAEBg4ABAQMCBgQMAgYEDAgYEDAIGBAwIGAQMCBgQMDADdGHmw3j9OEW8gjz6fBqBRYv5pOAxYt5VTRg8WJ+FdhCAwIGAQMCBqoHnPp5HeaXgEWMeVVjCy1izKfwP6UUMZ6BAQEDAgYEDAIGBAwIGBAwCBgQMCBgEDAgYEDAwD2czACdkxnESzQnMxhsRCxg8WJ+NbCFBgQMAgYEDFQP2FfJYn6Fr8AixrwK30KLGPPJyQzgGRgQMCBgEDAgYEDAgIBBwICAAQGDgAEBAwIGBAwNcDIDdE5mEC/RnMxgsBGxgMWL+dXAFhoQMAgYEDBQPWBfJYv5Fb4CixjzKnwLLWLMJyczgGdgQMCAgEHAgIABAQMCBgEDAgYEDAIGBAwIGBAwNMDJDKyKfxFtZAUWb03uawMBu8kiJjRgN1fEFNhCAwIGAQMCBqoH7HPCNrjPhVdgN1e8hG+h3WTx4mQGsAIDAgYEDAIGBAwIGBAwCBgQMCBgEDAgYEDAgIBBwICAAQEDAgYBAwIGBAwCBgQMCBgQMAgYEDAgYEDAIGBAwICAQcCAgAEBAwIGAQMCBgQMCBgEDAgYEDAIGBAwIGBAwCBgQMCAgEHAgIABAQMCBgEDAgYEDAgYBAwIGBAwCBgQMCBgQMAgYEDAgIABAYOAAQEDAgYBAwIGBAwIGAQMCBgQMAgYEDAgYEDAIGBAwICAAQFDJZulLjyMk9EFKzAgYBAwIGBAwAAAAAAAAAAAAAAAAAAAUNw37ThHgYdEOsgAAAAASUVORK5CYII=";

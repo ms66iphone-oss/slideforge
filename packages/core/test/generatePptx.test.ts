@@ -1,23 +1,13 @@
 import JSZip from "jszip";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import PptxGenJS from "pptxgenjs";
 import { describe, expect, it } from "vitest";
 
-import { addContentTitle, planContentPages, resolveResourceEmbed } from "../src/generatePptx.js";
-import type { CanvasLike, PdfjsLibLike } from "../src/pdfToSlides.js";
+import {
+  addContentTitle,
+  planContentPages,
+  resolveResourceDisposition,
+} from "../src/generatePptx.js";
 import type { GenItem, Theme } from "../src/types.js";
-import { buildSyntheticPdfDataUrl } from "./pdfFixture.js";
-
-// resolveResourceEmbed's PDF path needs a real canvas and a Node-targeted
-// PDF.js build, same as pdfToSlides.test.ts — jsdom has neither by default.
-let nodeCanvasFactory: (width: number, height: number) => CanvasLike;
-async function pdfDeps() {
-  if (!nodeCanvasFactory) {
-    const { createCanvas } = await import("@napi-rs/canvas");
-    nodeCanvasFactory = (w, h) => createCanvas(w, h) as unknown as CanvasLike;
-  }
-  return { pdfjsLib: pdfjsLib as unknown as PdfjsLibLike, canvasFactory: nodeCanvasFactory };
-}
 
 function paragraph(length: number): GenItem {
   return { kind: "paragraph", paragraph: [{ kind: "plain", text: "A".repeat(length) }] };
@@ -201,45 +191,51 @@ describe("addContentTitle", () => {
   });
 });
 
-describe("resolveResourceEmbed", () => {
-  it("embeds a docx/xlsx/pptx resource directly, unchanged", async () => {
-    const result = await resolveResourceEmbed({
+describe("resolveResourceDisposition", () => {
+  it("embeds a docx resource — a kind proven to actually open on double-click", () => {
+    const result = resolveResourceDisposition({
       filename: "handout.docx",
       dataUrl: "data:application/octet-stream;base64,AAAA",
     });
-    expect(result?.kind.progId).toBe("Word.Document.12");
-    expect(result?.dataUrl).toBe("data:application/octet-stream;base64,AAAA");
+    expect(result.kind).toBe("embed");
+    expect(result.kind === "embed" && result.embeddableKind.progId).toBe("Word.Document.12");
   });
 
-  it("converts a convertible PDF into an embeddable pptx", async () => {
-    const result = await resolveResourceEmbed(
-      { filename: "worksheet.pdf", dataUrl: buildSyntheticPdfDataUrl(2) },
-      await pdfDeps(),
-    );
-    expect(result?.kind.progId).toBe("PowerPoint.Show.12");
-    expect(result?.dataUrl).toContain(
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    );
+  it("embeds an xlsx resource the same way", () => {
+    const result = resolveResourceDisposition({
+      filename: "data.xlsx",
+      dataUrl: "data:application/octet-stream;base64,AAAA",
+    });
+    expect(result.kind).toBe("embed");
+    expect(result.kind === "embed" && result.embeddableKind.progId).toBe("Excel.Sheet.12");
   });
 
-  it("falls back to null for a PDF that can't be parsed", async () => {
-    const result = await resolveResourceEmbed(
-      { filename: "corrupt.pdf", dataUrl: "data:application/pdf;base64,AAAA" },
-      await pdfDeps(),
-    );
-    expect(result).toBeNull();
+  it("bundles a pptx resource instead of embedding it — Mac PowerPoint can't activate that embed", () => {
+    const result = resolveResourceDisposition({
+      filename: "slides.pptx",
+      dataUrl: "data:application/octet-stream;base64,AAAA",
+    });
+    expect(result.kind).toBe("bundle");
   });
 
-  it("returns null for a missing resource", async () => {
-    const result = await resolveResourceEmbed({ filename: "worksheet.pdf", dataUrl: null });
-    expect(result).toBeNull();
+  it("bundles a PDF resource — PDFs were never an OOXML package to begin with", () => {
+    const result = resolveResourceDisposition({
+      filename: "worksheet.pdf",
+      dataUrl: "data:application/pdf;base64,AAAA",
+    });
+    expect(result.kind).toBe("bundle");
   });
 
-  it("returns null for a file type that's neither a package nor a PDF", async () => {
-    const result = await resolveResourceEmbed({
+  it("bundles a file type outside the embeddable family in general", () => {
+    const result = resolveResourceDisposition({
       filename: "notes.txt",
       dataUrl: "data:text/plain;base64,AAAA",
     });
-    expect(result).toBeNull();
+    expect(result.kind).toBe("bundle");
+  });
+
+  it("reports a missing resource regardless of file type", () => {
+    const result = resolveResourceDisposition({ filename: "worksheet.pdf", dataUrl: null });
+    expect(result.kind).toBe("missing");
   });
 });

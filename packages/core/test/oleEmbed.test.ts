@@ -13,13 +13,19 @@ import {
 import type { PendingOleEmbed } from "../src/oleEmbed.js";
 
 describe("resolveEmbeddableKind", () => {
-  it("recognizes the OOXML package family, case-insensitively", () => {
+  it("recognizes docx/xlsx and their macro-enabled variants, case-insensitively", () => {
     expect(resolveEmbeddableKind("Handout.DOCX")?.progId).toBe("Word.Document.12");
+    expect(resolveEmbeddableKind("macro.docm")?.progId).toBe("Word.Document.12");
     expect(resolveEmbeddableKind("budget.xlsx")?.progId).toBe("Excel.Sheet.12");
-    expect(resolveEmbeddableKind("slides.pptm")?.progId).toBe("PowerPoint.Show.12");
+    expect(resolveEmbeddableKind("macro.xlsm")?.progId).toBe("Excel.Sheet.12");
   });
 
-  it("returns null for anything outside that family", () => {
+  it("returns null for pptx/pptm — structurally embeddable, but Mac PowerPoint can't activate it", () => {
+    expect(resolveEmbeddableKind("slides.pptx")).toBeNull();
+    expect(resolveEmbeddableKind("slides.pptm")).toBeNull();
+  });
+
+  it("returns null for anything outside the embeddable family", () => {
     expect(resolveEmbeddableKind("worksheet.pdf")).toBeNull();
     expect(resolveEmbeddableKind("photo.png")).toBeNull();
     expect(resolveEmbeddableKind("no-extension")).toBeNull();
