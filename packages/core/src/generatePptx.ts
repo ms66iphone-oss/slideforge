@@ -9,9 +9,38 @@
 import PptxGenJS from "pptxgenjs";
 
 import { embedOleObjects, resolveEmbeddableKind } from "./oleEmbed.js";
-import type { PendingOleEmbed } from "./oleEmbed.js";
+import type { EmbeddableKind, PendingOleEmbed } from "./oleEmbed.js";
+import { convertPdfToSlidesPptx } from "./pdfToSlides.js";
+import type { ConvertPdfDeps } from "./pdfToSlides.js";
 import { RESOURCE_ICON_PNG_BASE64 } from "./resourceIcon.js";
 import type { GenerationInput, GenItem, GenResource, GenSlide, TextRun, Theme } from "./types.js";
+
+/** A PDF isn't an OOXML package, so it can't be embedded the way
+ * docx/xlsx/pptx are (see oleEmbed.ts) — it's first converted into a small
+ * generated .pptx (one slide per page) and embedded as that instead. Done
+ * once here so the height this resource claims in the page-flow pass and the
+ * bytes actually embedded in the render pass always agree. Falls back to the
+ * plain resource card (null) if the PDF can't be parsed or rendered.
+ *
+ * `pdfDeps` only exists so tests can supply a Node-targeted PDF.js build and
+ * canvas (jsdom has neither) — production code never passes it, and gets the
+ * browser defaults from pdfToSlides.ts. */
+export async function resolveResourceEmbed(
+  resource: GenResource,
+  pdfDeps?: ConvertPdfDeps,
+): Promise<{ kind: EmbeddableKind; dataUrl: string } | null> {
+  if (!resource.dataUrl) return null;
+
+  const directKind = resolveEmbeddableKind(resource.filename);
+  if (directKind) return { kind: directKind, dataUrl: resource.dataUrl };
+
+  if (!/\.pdf$/i.test(resource.filename)) return null;
+  const converted = await convertPdfToSlidesPptx(resource.dataUrl, pdfDeps);
+  if (!converted) return null;
+  const pptxKind = resolveEmbeddableKind("converted.pptx");
+  if (!pptxKind) return null; // Unreachable — pptx is always a recognised kind.
+  return { kind: pptxKind, dataUrl: converted.dataUrl };
+}
 
 // pptxgenjs's shipped types don't model every option shape used below
 // (fill/line objects, the hyperlink run option, percentage-string
@@ -111,7 +140,12 @@ type FlowBlock =
   | { kind: "paragraph"; data: TextRun[]; height: number }
   | { kind: "bulletList"; data: string[]; height: number }
   | { kind: "table"; data: string[][]; height: number }
-  | { kind: "resource"; data: GenResource; height: number }
+  | {
+      kind: "resource";
+      data: GenResource;
+      embed: { kind: EmbeddableKind; dataUrl: string } | null;
+      height: number;
+    }
   | { kind: "imageRow"; data: ImageItem[]; boxes: ImageBox[]; height: number };
 
 type GroupedItem = GenItem | { kind: "imageRow"; images: ImageItem[] };
@@ -155,9 +189,9 @@ async function buildFlowBlocks(items: GenItem[]): Promise<FlowBlock[]> {
     } else if (item.kind === "table") {
       flowBlocks.push({ kind: "table", data: item.table, height: estimateTableHeight(item.table) });
     } else if (item.kind === "resource") {
-      const embeddable = item.resource.dataUrl && resolveEmbeddableKind(item.resource.filename);
-      const height = embeddable ? RESOURCE_ROW_HEIGHT : RESOURCE_CARD_HEIGHT;
-      flowBlocks.push({ kind: "resource", data: item.resource, height });
+      const embed = await resolveResourceEmbed(item.resource);
+      const height = embed ? RESOURCE_ROW_HEIGHT : RESOURCE_CARD_HEIGHT;
+      flowBlocks.push({ kind: "resource", data: item.resource, embed, height });
     } else if ("images" in item) {
       const boxes = await Promise.all(item.images.map((i) => estimateImageBox(i.image)));
       const height = Math.max(...boxes.map((b) => b.h)) + 0.15;
@@ -398,9 +432,9 @@ async function addContentSlide(
       } else if (block.kind === "resource") {
         flushParagraphBuffer();
         const resource = block.data;
-        const embeddableKind = resource.dataUrl ? resolveEmbeddableKind(resource.filename) : null;
+        const embed = block.embed;
 
-        if (resource.dataUrl && embeddableKind) {
+        if (embed) {
           // The visible icon + caption are rendered normally here; the
           // actual OLE embedding (what makes double-clicking it open the
           // real file) is patched into the .pptx afterwards in generatePptx().
@@ -430,8 +464,8 @@ async function addContentSlide(
           pendingEmbeds.push({
             slideNumber,
             filename: resource.filename,
-            dataUrl: resource.dataUrl,
-            kind: embeddableKind,
+            dataUrl: embed.dataUrl,
+            kind: embed.kind,
             x: 0.5,
             y: textY,
             w: RESOURCE_ICON_W,

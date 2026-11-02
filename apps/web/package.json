@@ -23,6 +23,7 @@
     "cn": "^0.5.1",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.64.0",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "simple-icons": "^16.36.0"

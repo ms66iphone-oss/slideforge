@@ -1,9 +1,23 @@
 import JSZip from "jszip";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import PptxGenJS from "pptxgenjs";
 import { describe, expect, it } from "vitest";
 
-import { addContentTitle, planContentPages } from "../src/generatePptx.js";
+import { addContentTitle, planContentPages, resolveResourceEmbed } from "../src/generatePptx.js";
+import type { CanvasLike, PdfjsLibLike } from "../src/pdfToSlides.js";
 import type { GenItem, Theme } from "../src/types.js";
+import { buildSyntheticPdfDataUrl } from "./pdfFixture.js";
+
+// resolveResourceEmbed's PDF path needs a real canvas and a Node-targeted
+// PDF.js build, same as pdfToSlides.test.ts — jsdom has neither by default.
+let nodeCanvasFactory: (width: number, height: number) => CanvasLike;
+async function pdfDeps() {
+  if (!nodeCanvasFactory) {
+    const { createCanvas } = await import("@napi-rs/canvas");
+    nodeCanvasFactory = (w, h) => createCanvas(w, h) as unknown as CanvasLike;
+  }
+  return { pdfjsLib: pdfjsLib as unknown as PdfjsLibLike, canvasFactory: nodeCanvasFactory };
+}
 
 function paragraph(length: number): GenItem {
   return { kind: "paragraph", paragraph: [{ kind: "plain", text: "A".repeat(length) }] };
@@ -184,5 +198,48 @@ describe("addContentTitle", () => {
     expect((xml.match(/<p:sp>/g) ?? []).length).toBe(2);
     expect(xml).toContain("Line One");
     expect(xml).toContain("Line Two Line Three");
+  });
+});
+
+describe("resolveResourceEmbed", () => {
+  it("embeds a docx/xlsx/pptx resource directly, unchanged", async () => {
+    const result = await resolveResourceEmbed({
+      filename: "handout.docx",
+      dataUrl: "data:application/octet-stream;base64,AAAA",
+    });
+    expect(result?.kind.progId).toBe("Word.Document.12");
+    expect(result?.dataUrl).toBe("data:application/octet-stream;base64,AAAA");
+  });
+
+  it("converts a convertible PDF into an embeddable pptx", async () => {
+    const result = await resolveResourceEmbed(
+      { filename: "worksheet.pdf", dataUrl: buildSyntheticPdfDataUrl(2) },
+      await pdfDeps(),
+    );
+    expect(result?.kind.progId).toBe("PowerPoint.Show.12");
+    expect(result?.dataUrl).toContain(
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    );
+  });
+
+  it("falls back to null for a PDF that can't be parsed", async () => {
+    const result = await resolveResourceEmbed(
+      { filename: "corrupt.pdf", dataUrl: "data:application/pdf;base64,AAAA" },
+      await pdfDeps(),
+    );
+    expect(result).toBeNull();
+  });
+
+  it("returns null for a missing resource", async () => {
+    const result = await resolveResourceEmbed({ filename: "worksheet.pdf", dataUrl: null });
+    expect(result).toBeNull();
+  });
+
+  it("returns null for a file type that's neither a package nor a PDF", async () => {
+    const result = await resolveResourceEmbed({
+      filename: "notes.txt",
+      dataUrl: "data:text/plain;base64,AAAA",
+    });
+    expect(result).toBeNull();
   });
 });
