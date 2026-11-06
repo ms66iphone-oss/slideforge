@@ -36,7 +36,7 @@ function lastPathComponent(path: string): string {
 }
 
 /** Strips a leading "<digits>_" prefix, e.g. "33_photo.png" -> "photo.png". */
-function stripLeadingNumericPrefix(name: string): string {
+export function stripLeadingNumericPrefix(name: string): string {
   const underscoreIndex = name.indexOf("_");
   if (underscoreIndex === -1) return name;
   const prefix = name.slice(0, underscoreIndex);

@@ -4,6 +4,8 @@ export { importResourceFolder } from "./folderImport.js";
 export { blockMeta } from "./lessonBlock.js";
 export { parseLessonHTML } from "./lessonHTMLParser.js";
 export { matchResource } from "./resourceMatcher.js";
+export { findResourceCandidates } from "./resourceSearch.js";
+export type { ResourceCandidate } from "./resourceSearch.js";
 export { assembleSlides, emptyContentSlide } from "./slideAssembler.js";
 export * from "./types.js";
 export { importResourceZip } from "./zipImport.js";
